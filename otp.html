@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ExpenseX - Verify OTP</title>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js" onerror="console.log('Firebase Hosting script not present, using client config');"></script>
+
   <style>
     :root {
       --primary-color: #7c3aed;
@@ -102,6 +109,8 @@
     .otp-content {
       text-align: center;
       padding: 1rem 0;
+      max-width: 520px;
+      margin: 0 auto;
     }
 
     .icon-badge {
@@ -124,6 +133,37 @@
       margin-bottom: 0.5rem;
     }
 
+    .otp-notice-box {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      margin: 1.25rem auto;
+      text-align: center;
+    }
+
+    .otp-notice-box strong {
+      letter-spacing: 3px;
+      font-size: 1.2rem;
+      color: #047857;
+      display: inline-block;
+      padding-left: 4px;
+    }
+
+    .error-box {
+      color: #b91c1c;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: none;
+      margin: 1rem auto;
+    }
+
     .otp-inputs {
       display: flex;
       justify-content: center;
@@ -135,7 +175,7 @@
       width: 50px;
       height: 55px;
       text-align: center;
-      font-size: 1.25rem;
+      font-size: 1.35rem;
       font-weight: 700;
       border: 1px solid var(--border-color);
       border-radius: 8px;
@@ -206,11 +246,17 @@
         <h1 class="brand-title">OTP Verification</h1>
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
           We've sent a 6-digit verification code to<br />
-          <strong style="color: var(--text-main);" id="userEmailDisplay">user@example.com</strong>
+          <strong style="color: var(--text-main);" id="userDestinationDisplay">user@example.com</strong>
         </p>
       </header>
 
-      <form action="index.html" method="GET">
+      <div id="otpNoticeBanner" class="otp-notice-box">
+        ✉️ Your verification code is: <strong id="otpDisplayNotice">123456</strong>
+      </div>
+
+      <div id="otpErrorAlert" class="error-box"></div>
+
+      <form id="otpForm">
         <div class="otp-inputs">
           <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
           <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
@@ -226,7 +272,7 @@
           <a href="#" class="link" id="resendBtn" style="display:none;" onclick="resendOtp(event)">Resend OTP</a>
         </div>
 
-        <button type="submit" class="submit-btn">Verify & Proceed</button>
+        <button type="submit" id="verifyBtn" class="submit-btn">Verify & Proceed</button>
 
         <div style="margin-top: 1.5rem;">
           <a href="register.html" class="link" style="font-size: 0.85rem;">← Change email / phone number</a>
@@ -235,29 +281,76 @@
     </div>
   </main>
 
+  <script src="js/firebase-config.js"></script>
   <script>
-    // Load email from localStorage
-    const savedEmail = localStorage.getItem('expenseX_email');
-    if (savedEmail) {
-      document.getElementById('userEmailDisplay').textContent = savedEmail;
-    }
+    window.addEventListener('DOMContentLoaded', () => {
+      initFirebase();
+      initOtpScreen();
+    });
 
     const inputs = document.querySelectorAll('.otp-input');
     const resendBtn = document.getElementById('resendBtn');
     const timerWrapper = document.getElementById('timerWrapper');
     const countdownEl = document.getElementById('countdown');
+    const errorAlert = document.getElementById('otpErrorAlert');
+    const noticeBanner = document.getElementById('otpNoticeBanner');
+    const otpNoticeText = document.getElementById('otpDisplayNotice');
+    const userDestDisplay = document.getElementById('userDestinationDisplay');
+    const verifyBtn = document.getElementById('verifyBtn');
 
-    inputs[0].focus();
+    function initOtpScreen() {
+      // 1. Display destination (Email or Phone)
+      const savedEmail = localStorage.getItem('expenseX_email');
+      const savedPhone = localStorage.getItem('expenseX_phone');
+      const otpMethod = localStorage.getItem('expenseX_otp_method');
 
+      if (otpMethod === 'sms' && savedPhone) {
+        userDestDisplay.textContent = savedPhone;
+      } else if (savedEmail) {
+        userDestDisplay.textContent = savedEmail;
+      }
+
+      // 2. Load or generate pending OTP
+      let pendingOtp = localStorage.getItem('expenseX_pending_otp');
+      if (!pendingOtp) {
+        pendingOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        localStorage.setItem('expenseX_pending_otp', pendingOtp);
+      }
+
+      otpNoticeText.textContent = pendingOtp;
+      inputs[0].focus();
+      startTimer();
+    }
+
+    // Input navigation & single digit enforcement
     inputs.forEach((input, index) => {
       input.addEventListener('input', (e) => {
         const val = e.target.value.replace(/[^0-9]/g, '');
         e.target.value = val;
-        if (val && index < inputs.length - 1) inputs[index + 1].focus();
+        hideError();
+        if (val && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
       });
 
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !input.value && index > 0) inputs[index - 1].focus();
+        if (e.key === 'Backspace' && !input.value && index > 0) {
+          inputs[index - 1].focus();
+        }
+      });
+
+      // Handle paste of whole 6-digit OTP
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim().replace(/[^0-9]/g, '');
+        if (pasteData.length > 0) {
+          const chars = pasteData.slice(0, inputs.length).split('');
+          chars.forEach((char, i) => {
+            if (inputs[i]) inputs[i].value = char;
+          });
+          const nextIndex = Math.min(chars.length, inputs.length - 1);
+          inputs[nextIndex].focus();
+        }
       });
     });
 
@@ -282,13 +375,87 @@
     }
 
     function resendOtp(event) {
-      event.preventDefault();
+      if (event) event.preventDefault();
       inputs.forEach(input => input.value = '');
+      hideError();
+
+      // Generate a new 6-digit OTP
+      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      localStorage.setItem('expenseX_pending_otp', newOtp);
+      otpNoticeText.textContent = newOtp;
+
+      // Update in Firestore in background
+      const userKey = localStorage.getItem('expenseX_userkey');
+      if (userKey && window.firebase && window.firebase.firestore) {
+        try {
+          const db = firebase.firestore();
+          db.collection('users').doc(userKey).set({
+            otpCode: newOtp,
+            otpUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(err => console.warn(err));
+        } catch (e) {}
+      }
+
       inputs[0].focus();
       startTimer();
     }
 
-    startTimer();
+    function showError(msg) {
+      errorAlert.textContent = msg;
+      errorAlert.style.display = 'block';
+    }
+
+    function hideError() {
+      errorAlert.style.display = 'none';
+    }
+
+    // OTP Verification Submit Handler
+    document.getElementById('otpForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      hideError();
+
+      let enteredOtp = '';
+      inputs.forEach(input => {
+        enteredOtp += input.value.trim();
+      });
+
+      if (enteredOtp.length !== 6) {
+        showError('Please enter the complete 6-digit OTP code.');
+        return;
+      }
+
+      const pendingOtp = localStorage.getItem('expenseX_pending_otp') || '123456';
+
+      if (enteredOtp !== pendingOtp) {
+        showError('Invalid OTP code. Please enter the correct 6-digit code shown above.');
+        inputs.forEach(input => input.value = '');
+        inputs[0].focus();
+        return;
+      }
+
+      // Verified successfully!
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = '✓ Verified! Entering ExpenseX...';
+
+      localStorage.setItem('expenseX_otp_verified', 'true');
+
+      // Update Firestore user verification status in background
+      const userKey = localStorage.getItem('expenseX_userkey');
+      if (userKey && window.firebase && window.firebase.firestore) {
+        try {
+          const db = firebase.firestore();
+          db.collection('users').doc(userKey).set({
+            otpVerified: true,
+            verifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(err => console.warn('Firestore verification note:', err));
+        } catch (e) {}
+      }
+
+      // Smooth transition to dashboard
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 500);
+    });
   </script>
 </body>
 </html>

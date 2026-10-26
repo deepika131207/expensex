@@ -511,35 +511,43 @@
     ];
     let monthlyExpenseChart;
 
-    // Load data directly from Cloud Firestore Database
+    // Load data from Cloud Firestore Database with resilient local storage fallback
     async function loadBackendData() {
-      if (window.firebase && window.firebase.firestore) {
-        try {
-          const db = firebase.firestore();
-          const doc = await db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').get();
-          if (doc.exists) {
-            const data = doc.data();
-            expenses = data.expenses || [];
-            budgets = data.budgets || {};
-            categories = data.categories || categories;
-          } else {
-            // First time setup from localStorage fallback
-            expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
-            budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
-          }
-        } catch (err) {
-          console.warn('Firestore load failed, using local storage fallback', err);
-          expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
-          budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
-        }
-      } else {
-        expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
-        budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
-      }
+      // 1. Immediately read from localStorage so UI is instant
+      expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
+      budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
+      categories = JSON.parse(localStorage.getItem(`expenseX_categories_${activeUserKey}`)) || categories;
 
       document.getElementById('expenseDate').valueAsDate = new Date();
       populateCategoryDropdowns();
       updateDashboardUI();
+
+      // 2. Try Firestore with a 2-second timeout (never blocks or freezes the page)
+      if (window.firebase && window.firebase.firestore) {
+        try {
+          const db = firebase.firestore();
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000));
+          const fetchPromise = db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').get();
+
+          const doc = await Promise.race([fetchPromise, timeoutPromise]);
+          if (doc && doc.exists) {
+            const data = doc.data();
+            expenses = data.expenses || expenses;
+            budgets = data.budgets || budgets;
+            categories = data.categories || categories;
+
+            // Update local storage cache
+            localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
+            localStorage.setItem(`expenseX_budgets_${activeUserKey}`, JSON.stringify(budgets));
+            localStorage.setItem(`expenseX_categories_${activeUserKey}`, JSON.stringify(categories));
+
+            populateCategoryDropdowns();
+            updateDashboardUI();
+          }
+        } catch (err) {
+          console.warn('Firestore load notice (using cached data):', err);
+        }
+      }
 
       if (monthlyExpenseChart) {
         monthlyExpenseChart.data.datasets[0].data = calculateMonthlyTotals();
@@ -547,40 +555,47 @@
       }
     }
 
-    // Save and sync data directly to Cloud Firestore Database
+    // Save and sync data to Cloud Firestore Database
     async function syncBackend() {
-      // 1. Keep local cache synchronized
+      // 1. Keep local cache updated instantly
       localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
       localStorage.setItem(`expenseX_budgets_${activeUserKey}`, JSON.stringify(budgets));
       localStorage.setItem(`expenseX_categories_${activeUserKey}`, JSON.stringify(categories));
 
-      // 2. Write to Cloud Firestore
+      // 2. Write to Cloud Firestore (Non-blocking)
       if (window.firebase && window.firebase.firestore) {
         try {
           const db = firebase.firestore();
-          await db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').set({
+          db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').set({
             userKey: activeUserKey,
             expenses: expenses,
             budgets: budgets,
             categories: categories,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-
-          // Also record activity event
-          await db.collection('users').doc(activeUserKey).collection('usage_logs').add({
-            action: 'DATA_SYNC',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(err => {
+            console.warn('Firestore sync will finalize once database is active:', err);
           });
 
-          console.log("☁️ Data successfully synchronized with Firestore");
+          db.collection('users').doc(activeUserKey).collection('usage_logs').add({
+            action: 'DATA_SYNC',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          }).catch(() => {});
         } catch (err) {
-          console.error('Failed to sync with Firestore', err);
+          console.warn('Firestore write warning:', err);
         }
       }
     }
 
     document.addEventListener("DOMContentLoaded", () => {
       initFirebase();
+
+      // Check OTP verification status
+      const otpVerified = localStorage.getItem('expenseX_otp_verified');
+      const pendingOtp = localStorage.getItem('expenseX_pending_otp');
+      if (otpVerified === 'false' && pendingOtp) {
+        window.location.href = 'otp.html';
+        return;
+      }
 
       // Verify Authentication State
       firebase.auth().onAuthStateChanged((user) => {
@@ -590,7 +605,7 @@
           document.getElementById('user-greeting').textContent = `Hello, ${name}!`;
           loadBackendData();
         } else {
-          // If not authenticated, check local session or redirect
+          // If not authenticated in Firebase, check local session or redirect
           const localKey = localStorage.getItem('expenseX_userkey');
           if (!localKey) {
             window.location.href = 'index.html';

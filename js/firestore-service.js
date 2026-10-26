@@ -104,23 +104,27 @@ const FirestoreService = {
     if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
       try {
         const db = firebase.firestore();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000));
+        
         // Master budget document
-        await db.collection('users').doc(uid).collection('budget_data').doc('main').set({
+        const writePromise = db.collection('users').doc(uid).collection('budget_data').doc('main').set({
           ...data,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
-        // Update overall stats on user document
-        await db.collection('users').doc(uid).set({
+        await Promise.race([writePromise, timeoutPromise]);
+
+        // Update overall stats on user document (Non-blocking)
+        db.collection('users').doc(uid).set({
           overallBudget: data.overallBudget || 0,
           totalExpensesCount: (data.expenses || []).length,
           lastDataSyncAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        }, { merge: true }).catch(() => {});
 
         console.log("☁️ Synced to Firestore successfully");
         return true;
       } catch (e) {
-        console.warn("Firestore sync error, data safely cached locally:", e);
+        console.warn("Firestore sync notice (data safely cached locally):", e);
       }
     }
     return false;

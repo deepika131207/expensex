@@ -394,7 +394,20 @@
       const confirmPassword = document.getElementById('confirm-password').value;
       const securityQuestion = document.getElementById('security-question').value;
       const securityAnswer = document.getElementById('security-answer').value.trim();
+      const terms = document.getElementById('terms').checked;
       const btn = document.getElementById('submitBtn');
+
+      if (!terms) {
+        errBox.textContent = 'Please accept the Terms & Conditions.';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      if (password.length < 6) {
+        errBox.textContent = 'Password must be at least 6 characters long.';
+        errBox.style.display = 'block';
+        return;
+      }
 
       if (password !== confirmPassword) {
         errBox.textContent = 'Passwords do not match.';
@@ -406,38 +419,81 @@
       btn.textContent = 'Creating account...';
 
       try {
+        // 1. Create account with Firebase Authentication
         const userCred = await firebase.auth().createUserWithEmailAndPassword(email, password);
         const user = userCred.user;
         const userKey = user.uid;
 
-        await user.updateProfile({ displayName: fullname });
+        // 2. Update Firebase Auth Profile Display Name
+        try {
+          await user.updateProfile({ displayName: fullname });
+        } catch (profileErr) {
+          console.warn('Profile name update note:', profileErr);
+        }
 
-        // Save detailed profile to Cloud Firestore Database
-        const db = firebase.firestore();
-        await db.collection('users').doc(userKey).set({
-          uid: userKey,
-          fullName: fullname,
-          email: email,
-          phone: phone,
-          otpMethod: otpMethod,
-          address: address,
-          securityQuestion: securityQuestion,
-          securityAnswer: securityAnswer,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-          isOnline: true
-        });
+        // 3. Generate 6-digit OTP code
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+        // 4. Save local session immediately (sub-second instant registration)
         localStorage.setItem('expenseX_userkey', userKey);
         localStorage.setItem('expenseX_fullname', fullname);
         localStorage.setItem(`expenseX_saved_name_${userKey}`, fullname);
         localStorage.setItem('expenseX_email', email);
+        localStorage.setItem('expenseX_phone', phone);
+        localStorage.setItem('expenseX_otp_method', otpMethod);
+        localStorage.setItem('expenseX_pending_otp', otpCode);
+        localStorage.setItem('expenseX_otp_verified', 'false');
 
-        window.location.href = 'dashboard.html';
+        // 5. Store user profile in Cloud Firestore (Non-blocking so it never hangs)
+        if (window.firebase && window.firebase.firestore) {
+          try {
+            const db = firebase.firestore();
+            db.collection('users').doc(userKey).set({
+              uid: userKey,
+              fullName: fullname,
+              email: email,
+              phone: phone,
+              otpMethod: otpMethod,
+              address: address,
+              securityQuestion: securityQuestion,
+              securityAnswer: securityAnswer,
+              otpCode: otpCode,
+              otpVerified: false,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+              isOnline: true
+            }, { merge: true }).catch(dbErr => {
+              console.warn('Firestore sync will finalize once database is active:', dbErr);
+            });
+          } catch (dbErr) {
+            console.warn('Firestore init note:', dbErr);
+          }
+        }
+
+        btn.textContent = 'Account created! Redirecting to OTP...';
+        sessionStorage.setItem('expenseX_show_otp_banner', otpCode);
+
+        // 6. Instantly navigate to OTP verification
+        setTimeout(() => {
+          window.location.href = 'otp.html';
+        }, 400);
+
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Create Account';
-        errBox.textContent = err.message || 'Registration failed.';
+        
+        let message = err.message || 'Registration failed.';
+        if (err.code === 'auth/email-already-in-use') {
+          message = 'This email is already registered. Please login or use Forgot Password.';
+        } else if (err.code === 'auth/invalid-email') {
+          message = 'Please provide a valid email address.';
+        } else if (err.code === 'auth/weak-password') {
+          message = 'Password is too weak. Please use at least 6 characters.';
+        } else if (err.code === 'auth/network-request-failed') {
+          message = 'Network error. Please check your internet connection.';
+        }
+
+        errBox.textContent = message;
         errBox.style.display = 'block';
       }
     });

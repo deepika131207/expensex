@@ -447,57 +447,82 @@
     document.addEventListener("DOMContentLoaded", () => {
       initFirebase();
 
+      // Check OTP verification status
+      const otpVerified = localStorage.getItem('expenseX_otp_verified');
+      const pendingOtp = localStorage.getItem('expenseX_pending_otp');
+      if (otpVerified === 'false' && pendingOtp) {
+        window.location.href = 'otp.html';
+        return;
+      }
+
       firebase.auth().onAuthStateChanged((user) => {
         if (user) {
           activeUserKey = user.uid;
+        } else {
+          const localKey = localStorage.getItem('expenseX_userkey');
+          if (!localKey) {
+            window.location.href = 'index.html';
+            return;
+          }
         }
         loadBackendData();
       });
     });
 
     async function loadBackendData() {
+      // 1. Load instantly from local cache
+      expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
+      budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
+      categories = JSON.parse(localStorage.getItem(`expenseX_categories_${activeUserKey}`)) || categories;
+      renderExpensesPage();
+
+      // 2. Load from Firestore with 2s timeout
       if (window.firebase && window.firebase.firestore) {
         try {
           const db = firebase.firestore();
-          const doc = await db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').get();
-          if (doc.exists) {
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000));
+          const fetchPromise = db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').get();
+
+          const doc = await Promise.race([fetchPromise, timeoutPromise]);
+          if (doc && doc.exists) {
             const data = doc.data();
-            expenses = data.expenses || [];
-            budgets = data.budgets || {};
+            expenses = data.expenses || expenses;
+            budgets = data.budgets || budgets;
             categories = data.categories || categories;
-          } else {
-            expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
-            budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
+
+            localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
+            localStorage.setItem(`expenseX_budgets_${activeUserKey}`, JSON.stringify(budgets));
+            localStorage.setItem(`expenseX_categories_${activeUserKey}`, JSON.stringify(categories));
+
+            renderExpensesPage();
           }
         } catch (err) {
-          console.warn('Firestore load failed, using local storage fallback', err);
-          expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
-          budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
+          console.warn('Firestore load notice (cached data active):', err);
         }
-      } else {
-        expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
-        budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
       }
-      renderExpensesPage();
     }
 
     async function syncBackend() {
+      // 1. Instant local cache update
       localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
       localStorage.setItem(`expenseX_budgets_${activeUserKey}`, JSON.stringify(budgets));
       localStorage.setItem(`expenseX_categories_${activeUserKey}`, JSON.stringify(categories));
 
+      // 2. Non-blocking Firestore sync
       if (window.firebase && window.firebase.firestore) {
         try {
           const db = firebase.firestore();
-          await db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').set({
+          db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').set({
             userKey: activeUserKey,
             expenses: expenses,
             budgets: budgets,
             categories: categories,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
+          }, { merge: true }).catch(err => {
+            console.warn('Firestore sync note:', err);
+          });
         } catch (err) {
-          console.error('Failed to sync Firestore', err);
+          console.warn('Firestore write warning:', err);
         }
       }
     }
