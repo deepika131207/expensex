@@ -101,7 +101,8 @@ const FirestoreService = {
   },
 
   async syncToFirestore(uid, data) {
-    if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
+    const isReady = window.firebase && window.firebase.firestore && window.firebase.apps && window.firebase.apps.length > 0;
+    if (isReady) {
       try {
         const db = firebase.firestore();
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000));
@@ -136,7 +137,8 @@ const FirestoreService = {
     onDataUpdate(localData);
 
     // 2. If Firestore is active, listen for real-time changes
-    if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
+    const isReady = window.firebase && window.firebase.firestore && window.firebase.apps && window.firebase.apps.length > 0;
+    if (isReady) {
       try {
         const db = firebase.firestore();
         const docRef = db.collection('users').doc(uid).collection('budget_data').doc('main');

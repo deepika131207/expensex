@@ -25,5 +25,8 @@
         "destination": "/expenses.html"
       }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }

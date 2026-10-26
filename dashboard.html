@@ -11,7 +11,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="/__/firebase/init.js" onerror="console.log('Firebase Hosting script not present, using client config');"></script>
 
   <style>
     :root {
@@ -522,28 +521,35 @@
       populateCategoryDropdowns();
       updateDashboardUI();
 
-      // 2. Try Firestore with a 2-second timeout (never blocks or freezes the page)
+      // 2. Connect to Cloud Firestore with real-time sync
       if (window.firebase && window.firebase.firestore) {
         try {
           const db = firebase.firestore();
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000));
-          const fetchPromise = db.collection('users').doc(activeUserKey).collection('data').doc('budget_data').get();
+          // Real-time listener: loads immediately from Firestore cache/network and keeps updated
+          db.collection('users').doc(activeUserKey).collection('data').doc('budget_data')
+            .onSnapshot((doc) => {
+              if (doc && doc.exists) {
+                const data = doc.data();
+                expenses = data.expenses || expenses;
+                budgets = data.budgets || budgets;
+                categories = data.categories || categories;
 
-          const doc = await Promise.race([fetchPromise, timeoutPromise]);
-          if (doc && doc.exists) {
-            const data = doc.data();
-            expenses = data.expenses || expenses;
-            budgets = data.budgets || budgets;
-            categories = data.categories || categories;
+                // Update local storage cache
+                localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
+                localStorage.setItem(`expenseX_budgets_${activeUserKey}`, JSON.stringify(budgets));
+                localStorage.setItem(`expenseX_categories_${activeUserKey}`, JSON.stringify(categories));
 
-            // Update local storage cache
-            localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
-            localStorage.setItem(`expenseX_budgets_${activeUserKey}`, JSON.stringify(budgets));
-            localStorage.setItem(`expenseX_categories_${activeUserKey}`, JSON.stringify(categories));
+                populateCategoryDropdowns();
+                updateDashboardUI();
 
-            populateCategoryDropdowns();
-            updateDashboardUI();
-          }
+                if (monthlyExpenseChart) {
+                  monthlyExpenseChart.data.datasets[0].data = calculateMonthlyTotals();
+                  monthlyExpenseChart.update();
+                }
+              }
+            }, (err) => {
+              console.warn('Firestore real-time sync notice:', err);
+            });
         } catch (err) {
           console.warn('Firestore load notice (using cached data):', err);
         }

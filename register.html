@@ -9,7 +9,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="/__/firebase/init.js" onerror="console.log('Firebase Hosting script not present, using client config');"></script>
 
   <style>
     :root {
@@ -411,14 +410,14 @@
         // 3. Fire-and-forget profile display name update in background
         user.updateProfile({ displayName: fullname }).catch(() => {});
 
-        // 4. Fire-and-forget Cloud Firestore profile sync in background
+        // 4. Save user document and default budget to Firestore Database in background
         if (window.firebase && window.firebase.firestore) {
           try {
             const db = firebase.firestore();
             db.collection('users').doc(userKey).set({
               uid: userKey,
               fullName: fullname,
-              email: email,
+              email: email.toLowerCase(),
               phone: phone,
               securityQuestion: securityQuestion,
               securityAnswer: securityAnswer,
@@ -426,11 +425,28 @@
               lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
               isOnline: true
             }, { merge: true }).catch(() => {});
+
+            // Initialize default starter budget_data in Firestore
+            db.collection('users').doc(userKey).collection('data').doc('budget_data').set({
+              userKey: userKey,
+              email: email.toLowerCase(),
+              expenses: [],
+              budgets: {
+                overall: 40000,
+                food: 10000,
+                travel: 8000,
+                entertainment: 5000,
+                groceries: 7000,
+                medical: 3000
+              },
+              categories: ['Food', 'Travel', 'Entertainment', 'Groceries', 'Medical', 'Bills and payments', 'Other'],
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).catch(() => {});
           } catch (e) {}
         }
 
-        // 5. Instantly redirect straight to Dashboard!
-        window.location.href = 'dashboard.html';
+        // 5. Instantly navigate straight to Dashboard!
+        window.location.replace('dashboard.html');
 
       } catch (err) {
         btn.disabled = false;

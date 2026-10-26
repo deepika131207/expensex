@@ -13,7 +13,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="/__/firebase/init.js" onerror="console.log('Firebase Hosting script not present, using client config');"></script>
 
   <style>
     :root {
@@ -373,13 +372,26 @@
       initFirebase();
 
       // If user is already authenticated, redirect to dashboard
-      firebase.auth().onAuthStateChanged((user) => {
+      firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
           const userKey = user.uid;
           localStorage.setItem('expenseX_userkey', userKey);
           localStorage.setItem('expenseX_email', user.email);
           localStorage.setItem('expenseX_fullname', user.displayName || user.email.split('@')[0]);
-          window.location.href = 'dashboard.html';
+
+          // Restore data from Firestore into local cache
+          try {
+            const db = firebase.firestore();
+            const doc = await db.collection('users').doc(userKey).collection('data').doc('budget_data').get();
+            if (doc.exists) {
+              const data = doc.data();
+              if (data.expenses) localStorage.setItem(`expenseX_expenses_${userKey}`, JSON.stringify(data.expenses));
+              if (data.budgets) localStorage.setItem(`expenseX_budgets_${userKey}`, JSON.stringify(data.budgets));
+              if (data.categories) localStorage.setItem(`expenseX_categories_${userKey}`, JSON.stringify(data.categories));
+            }
+          } catch (e) {}
+
+          window.location.replace('dashboard.html');
         }
       });
     });
@@ -406,28 +418,30 @@
         localStorage.setItem('expenseX_fullname', name);
         localStorage.setItem('expenseX_otp_verified', 'true');
 
-        // Record login in Cloud Firestore Database (Non-blocking)
-        if (window.firebase && window.firebase.firestore) {
-          try {
-            const db = firebase.firestore();
-            db.collection('users').doc(userKey).set({
-              email: user.email,
-              displayName: name,
-              lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-              loginCount: firebase.firestore.FieldValue.increment(1),
-              isOnline: true
-            }, { merge: true }).catch(() => {});
+        // Restore user data from Cloud Firestore Database
+        try {
+          const db = firebase.firestore();
+          db.collection('users').doc(userKey).set({
+            email: user.email.toLowerCase(),
+            displayName: name,
+            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+            loginCount: firebase.firestore.FieldValue.increment(1),
+            isOnline: true
+          }, { merge: true }).catch(() => {});
 
-            db.collection('users').doc(userKey).collection('login_history').add({
-              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-              device: navigator.userAgent
-            }).catch(() => {});
-          } catch (dbErr) {
-            console.warn("Firestore audit log note:", dbErr);
+          // Fetch all saved budgets and expenses so they immediately appear!
+          const dataDoc = await db.collection('users').doc(userKey).collection('data').doc('budget_data').get();
+          if (dataDoc.exists) {
+            const data = dataDoc.data();
+            if (data.expenses) localStorage.setItem(`expenseX_expenses_${userKey}`, JSON.stringify(data.expenses));
+            if (data.budgets) localStorage.setItem(`expenseX_budgets_${userKey}`, JSON.stringify(data.budgets));
+            if (data.categories) localStorage.setItem(`expenseX_categories_${userKey}`, JSON.stringify(data.categories));
           }
+        } catch (dbErr) {
+          console.warn("Firestore data load notice:", dbErr);
         }
 
-        window.location.href = 'dashboard.html';
+        window.location.replace('dashboard.html');
       } catch (err) {
         btn.disabled = false;
         btn.innerHTML = '<span>₹</span> Login';
