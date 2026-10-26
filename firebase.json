@@ -6,7 +6,10 @@
       ".firebaserc",
       "**/.*",
       "**/node_modules/**",
-      "expensex-backend/**"
+      "expensex-backend/**",
+      "*.bat",
+      "*.cmd",
+      "mvnw*"
     ],
     "rewrites": [
       {

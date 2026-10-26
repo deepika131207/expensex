@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExpenseX - Verify OTP</title>
+  <style>
+    :root {
+      --primary-color: #7c3aed;
+      --primary-dark: #6d28d9;
+      --bg-color: #7b5ac6;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #cbd5e1;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 2.5rem 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .otp-container {
+      width: 100%;
+      max-width: 950px;
+      background-color: var(--card-bg);
+      padding: 2.5rem;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .brand-header-center {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1.5rem;
+    }
+
+    .brand-graphic {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-svg {
+      width: 48px;
+      height: 48px;
+    }
+
+    .brand-text-wrapper {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .brand-name {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--success);
+    }
+
+    .brand-name .x-accent {
+      color: var(--primary-color);
+    }
+
+    .brand-tagline {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .brand-tagline .dash {
+      display: inline-block;
+      width: 10px;
+      height: 1px;
+      background-color: var(--primary-color);
+    }
+
+    .otp-content {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .icon-badge {
+      width: 60px;
+      height: 60px;
+      background-color: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem auto;
+      font-size: 1.5rem;
+    }
+
+    .brand-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 0.5rem;
+    }
+
+    .otp-inputs {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin: 1.75rem 0;
+    }
+
+    .otp-input {
+      width: 50px;
+      height: 55px;
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 700;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .otp-input:focus {
+      border-color: var(--success);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    .submit-btn {
+      width: 100%;
+      max-width: 400px;
+      padding: 0.875rem;
+      background-color: var(--success);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin: 1rem auto 0 auto;
+      display: block;
+    }
+
+    .submit-btn:hover {
+      background-color: #059669;
+    }
+
+    .link {
+      color: var(--primary-color);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="otp-container">
+    <header class="brand-header-center">
+      <div class="brand-graphic">
+        <svg viewBox="0 0 100 100" class="brand-svg">
+          <path d="M 46 14 A 32 32 0 1 0 74 62" fill="none" stroke="#10b981" stroke-width="6.5" stroke-linecap="round" />
+          <polygon points="46,6 46,22 34,14" fill="#10b981" />
+          <text x="44" y="58" text-anchor="middle" font-size="34" font-weight="900" fill="#10b981" font-family="'Poppins', sans-serif">₹</text>
+          <line x1="58" y1="46" x2="80" y2="24" stroke="#7c3aed" stroke-width="5.5" stroke-linecap="round" />
+          <polygon points="85,20 72,21 82,32" fill="#7c3aed" />
+          <path d="M 52 82 L 52 70 L 64 70 L 64 56 L 76 56 L 76 42 L 86 42 L 86 82 Z" fill="#7c3aed" />
+        </svg>
+      </div>
+      <div class="brand-text-wrapper">
+        <h1 class="brand-name">Expense<span class="x-accent">X</span></h1>
+        <p class="brand-tagline"><span class="dash"></span> Track Expenses. Manage Better. Save More. <span class="dash"></span></p>
+      </div>
+    </header>
+
+    <div class="otp-content">
+      <div class="icon-badge">🔒</div>
+
+      <header>
+        <h1 class="brand-title">OTP Verification</h1>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+          We've sent a 6-digit verification code to<br />
+          <strong style="color: var(--text-main);" id="userEmailDisplay">user@example.com</strong>
+        </p>
+      </header>
+
+      <form action="index.html" method="GET">
+        <div class="otp-inputs">
+          <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+          <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+          <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+          <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+          <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+          <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+          Didn't receive the code? 
+          <span id="timerWrapper">Resend in <strong style="color: var(--success);" id="countdown">00:45</strong></span>
+          <a href="#" class="link" id="resendBtn" style="display:none;" onclick="resendOtp(event)">Resend OTP</a>
+        </div>
+
+        <button type="submit" class="submit-btn">Verify & Proceed</button>
+
+        <div style="margin-top: 1.5rem;">
+          <a href="register.html" class="link" style="font-size: 0.85rem;">← Change email / phone number</a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    // Load email from localStorage
+    const savedEmail = localStorage.getItem('expenseX_email');
+    if (savedEmail) {
+      document.getElementById('userEmailDisplay').textContent = savedEmail;
+    }
+
+    const inputs = document.querySelectorAll('.otp-input');
+    const resendBtn = document.getElementById('resendBtn');
+    const timerWrapper = document.getElementById('timerWrapper');
+    const countdownEl = document.getElementById('countdown');
+
+    inputs[0].focus();
+
+    inputs.forEach((input, index) => {
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = val;
+        if (val && index < inputs.length - 1) inputs[index + 1].focus();
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && index > 0) inputs[index - 1].focus();
+      });
+    });
+
+    let timeLeft = 45;
+    let timerInterval;
+
+    function startTimer() {
+      timeLeft = 45;
+      resendBtn.style.display = 'none';
+      timerWrapper.style.display = 'inline';
+      clearInterval(timerInterval);
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        countdownEl.textContent = timeLeft < 10 ? `00:0${timeLeft}` : `00:${timeLeft}`;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          timerWrapper.style.display = 'none';
+          resendBtn.style.display = 'inline';
+        }
+      }, 1000);
+    }
+
+    function resendOtp(event) {
+      event.preventDefault();
+      inputs.forEach(input => input.value = '');
+      inputs[0].focus();
+      startTimer();
+    }
+
+    startTimer();
+  </script>
+</body>
+</html>
