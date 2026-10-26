@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExpenseX - Create New Account</title>
+  <meta name="description" content="Register for ExpenseX to track monthly budgets and expenses." />
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Firebase SDKs (Compat CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase Hosting Reserved Init Script -->
+  <script src="/__/firebase/init.js" onerror="console.log('Firebase Hosting init script not found, using client config');"></script>
+</head>
+<body class="auth-page">
+
+  <main class="auth-card" style="max-width: 520px;">
+    <header class="auth-header">
+      <svg viewBox="0 0 100 100" class="brand-svg">
+        <path d="M 46 14 A 32 32 0 1 0 74 62" fill="none" stroke="#10b981" stroke-width="7" stroke-linecap="round" />
+        <polygon points="46,6 46,22 34,14" fill="#10b981" />
+        <text x="44" y="58" text-anchor="middle" font-size="34" font-weight="900" fill="#10b981" font-family="'Poppins', sans-serif">₹</text>
+        <line x1="58" y1="46" x2="80" y2="24" stroke="#7c3aed" stroke-width="6" stroke-linecap="round" />
+        <polygon points="85,20 72,21 82,32" fill="#7c3aed" />
+        <path d="M 52 82 L 52 70 L 64 70 L 64 56 L 76 56 L 76 42 L 86 42 L 86 82 Z" fill="#7c3aed" />
+      </svg>
+      <h1>Create <span style="color: var(--primary);">Account</span></h1>
+      <p>Join ExpenseX and take full control of your finances</p>
+    </header>
+
+    <form id="registerForm" class="auth-form" onsubmit="handleRegisterSubmit(event)">
+      <div class="form-group">
+        <label for="regFullName">Full Name *</label>
+        <input type="text" id="regFullName" placeholder="e.g. Deepika Upadhyay" required autocomplete="name" />
+      </div>
+
+      <div class="form-group">
+        <label for="regEmail">Email Address *</label>
+        <input type="email" id="regEmail" placeholder="e.g. user@example.com" required autocomplete="email" />
+      </div>
+
+      <div class="form-group">
+        <label for="regPassword">Password *</label>
+        <input type="password" id="regPassword" placeholder="Minimum 6 characters" required minlength="6" autocomplete="new-password" />
+      </div>
+
+      <div class="form-group">
+        <label for="regConfirmPassword">Confirm Password *</label>
+        <input type="password" id="regConfirmPassword" placeholder="Re-enter password" required minlength="6" autocomplete="new-password" />
+      </div>
+
+      <div class="form-group">
+        <label for="regSecurityQuestion">Security Question</label>
+        <select id="regSecurityQuestion" required>
+          <option value="" disabled selected>Select a question for account recovery</option>
+          <option value="city">What city were you born in?</option>
+          <option value="school">What was the name of your first school?</option>
+          <option value="pet">What was your childhood pet's name?</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="regSecurityAnswer">Security Answer</label>
+        <input type="text" id="regSecurityAnswer" placeholder="Your answer" required />
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.25rem;">
+        <input type="checkbox" id="regTerms" required style="width: auto; margin-top: 0.25rem; cursor: pointer;" />
+        <label for="regTerms" style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; margin-bottom: 0;">
+          I agree to the Terms of Service & Privacy Policy of ExpenseX
+        </label>
+      </div>
+
+      <button type="submit" id="regBtn" class="btn btn-primary" style="width: 100%; margin-top: 0.85rem; padding: 0.85rem;">
+        Register Account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="index.html">Log In</a>
+    </div>
+  </main>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await window.ExpenseXAuth.init();
+      window.ExpenseXAuth.redirectIfAuthenticated();
+    });
+
+    async function handleRegisterSubmit(e) {
+      e.preventDefault();
+      const fullName = document.getElementById('regFullName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const confirmPassword = document.getElementById('regConfirmPassword').value;
+      const question = document.getElementById('regSecurityQuestion').value;
+      const answer = document.getElementById('regSecurityAnswer').value.trim();
+      const btn = document.getElementById('regBtn');
+
+      if (password !== confirmPassword) {
+        window.ExpenseXAuth.showToast('Passwords do not match.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating account...';
+
+      const result = await window.ExpenseXAuth.register(fullName, email, password, question, answer);
+      if (result.success) {
+        window.ExpenseXAuth.showToast('Account created successfully! Welcome to ExpenseX.', 'success');
+        setTimeout(() => {
+          window.location.href = 'dashboard.html';
+        }, 700);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Register Account';
+        window.ExpenseXAuth.showToast(result.error || 'Registration failed.', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

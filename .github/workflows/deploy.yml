@@ -1,0 +1,53 @@
+name: Deploy ExpenseX to GitHub Pages & Firebase
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Deploy to GitHub Pages
+  deploy-github-pages:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Optional automated Firebase Hosting deployment if secret is configured
+  deploy-firebase:
+    needs: deploy-github-pages
+    runs-on: ubuntu-latest
+    if: false # Enable when secret FIREBASE_SERVICE_ACCOUNT_EXPENSEX_A6D8A is added in repo Settings -> Secrets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EXPENSEX_A6D8A }}
+          projectId: expensex-a6d8a
+          channelId: live

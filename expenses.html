@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExpenseX - Transactions & Expense History</title>
+  <meta name="description" content="View and manage all your ExpenseX category transactions." />
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase SDKs (Compat CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase Hosting Reserved Init Script -->
+  <script src="/__/firebase/init.js" onerror="console.log('Firebase Hosting init script not found, using client config');"></script>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <a href="dashboard.html" class="brand-wrapper">
+        <svg viewBox="0 0 100 100" class="brand-svg">
+          <path d="M 46 14 A 32 32 0 1 0 74 62" fill="none" stroke="#10b981" stroke-width="7" stroke-linecap="round" />
+          <polygon points="46,6 46,22 34,14" fill="#10b981" />
+          <text x="44" y="58" text-anchor="middle" font-size="34" font-weight="900" fill="#10b981" font-family="'Poppins', sans-serif">₹</text>
+          <line x1="58" y1="46" x2="80" y2="24" stroke="#7c3aed" stroke-width="6" stroke-linecap="round" />
+          <polygon points="85,20 72,21 82,32" fill="#7c3aed" />
+          <path d="M 52 82 L 52 70 L 64 70 L 64 56 L 76 56 L 76 42 L 86 42 L 86 82 Z" fill="#7c3aed" />
+        </svg>
+        <div>
+          <h1 class="brand-name">Expense<span class="x-accent">X</span></h1>
+          <p class="brand-tagline">Track Expenses • Manage Better • Save More</p>
+        </div>
+      </a>
+
+      <nav class="nav-tabs">
+        <a href="dashboard.html" class="nav-tab-btn">
+          <span>📊</span> Dashboard
+        </a>
+        <a href="dashboard.html" onclick="sessionStorage.setItem('openTab', 'bars')" class="nav-tab-btn">
+          <span>📈</span> Expense Bars
+        </a>
+        <a href="expenses.html" class="nav-tab-btn active">
+          <span>📋</span> All Expenses
+        </a>
+      </nav>
+
+      <div class="header-actions">
+        <div class="user-pill">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <span id="userGreeting">User</span>
+        </div>
+        <button class="btn-logout" onclick="window.ExpenseXAuth.logout()">
+          <span>⏻</span> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-wrapper">
+    <div class="welcome-hero">
+      <div>
+        <h1>Transactions & Expense Log</h1>
+        <p>Review every transaction categorized under your account.</p>
+      </div>
+      <div class="hero-actions">
+        <a href="dashboard.html" class="btn btn-outline">
+          ← Back to Dashboard
+        </a>
+        <button class="btn btn-primary" onclick="openAddExpenseModal()">
+          ＋ Add Expense
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-budget">
+        <div class="kpi-header">
+          <span class="kpi-title">Total Expenses Recorded</span>
+          <div class="kpi-icon-badge" style="color: var(--primary);">🧾</div>
+        </div>
+        <div class="kpi-amount" id="statTxCount">0</div>
+        <div class="kpi-footer">
+          <span>All-time count</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-spent">
+        <div class="kpi-header">
+          <span class="kpi-title">Total Spending Amount</span>
+          <div class="kpi-icon-badge" style="color: var(--accent-rose);">💸</div>
+        </div>
+        <div class="kpi-amount" id="statTxTotal">₹0</div>
+        <div class="kpi-footer">
+          <span>Cumulative expenditure</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-remaining">
+        <div class="kpi-header">
+          <span class="kpi-title">Active Categories</span>
+          <div class="kpi-icon-badge" style="color: var(--secondary);">🏷️</div>
+        </div>
+        <div class="kpi-amount" id="statCatCount">0</div>
+        <div class="kpi-footer">
+          <span>With recorded spending</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transactions List Section -->
+    <div class="section-card">
+      <div class="transactions-toolbar">
+        <div class="search-box">
+          <span class="icon">🔍</span>
+          <input type="text" id="txSearchInput" placeholder="Filter by title or category..." oninput="renderTable()" />
+        </div>
+        <select id="txCategoryFilter" class="filter-select" onchange="renderTable()">
+          <option value="all">All Categories</option>
+        </select>
+      </div>
+
+      <div class="table-responsive">
+        <table class="expense-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Description / Title</th>
+              <th>Amount (₹)</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="txTableBody">
+            <!-- Populated via script -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="emptyTxState" class="empty-state" style="display: none;">
+        <div class="icon">🧾</div>
+        <h4>No Expenses Found</h4>
+        <p>Click "Add Expense" to record a new transaction.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Expense Modal -->
+  <div id="expenseModal" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add New Expense</h3>
+        <button class="btn-close" onclick="closeAddExpenseModal()">&times;</button>
+      </div>
+      <form onsubmit="handleExpenseSave(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="modalExpenseCategory">Category *</label>
+            <select id="modalExpenseCategory" required>
+              <option value="" disabled selected>Select category</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="modalExpenseAmount">Amount (₹) *</label>
+            <div class="input-with-symbol">
+              <span class="symbol">₹</span>
+              <input type="number" id="modalExpenseAmount" placeholder="e.g. 1200" min="1" step="1" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="modalExpenseTitle">Description / Title *</label>
+            <input type="text" id="modalExpenseTitle" placeholder="e.g. Travel tickets, Grocery run" required />
+          </div>
+
+          <div class="form-group">
+            <label for="modalExpenseDate">Date *</label>
+            <input type="date" id="modalExpenseDate" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeAddExpenseModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/firestore-service.js"></script>
+  <script>
+    let currentUser = null;
+    let appData = { expenses: [], categories: [] };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await window.ExpenseXAuth.init();
+      currentUser = window.ExpenseXAuth.requireAuth();
+      if (!currentUser) return;
+
+      const name = currentUser.displayName || 'User';
+      document.getElementById('userGreeting').textContent = name;
+      document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+      document.getElementById('modalExpenseDate').valueAsDate = new Date();
+
+      window.ExpenseXDB.subscribe(currentUser.uid, (data) => {
+        appData = data;
+        updateStats();
+        renderTable();
+      });
+    });
+
+    function updateStats() {
+      const expenses = appData.expenses || [];
+      const totalAmt = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const uniqueCats = new Set(expenses.map(e => (e.category || '').toLowerCase()));
+
+      document.getElementById('statTxCount').textContent = expenses.length;
+      document.getElementById('statTxTotal').textContent = `₹${totalAmt.toLocaleString('en-IN')}`;
+      document.getElementById('statCatCount').textContent = uniqueCats.size;
+
+      // Populate Category Filter
+      const catFilter = document.getElementById('txCategoryFilter');
+      const cur = catFilter.value;
+      catFilter.innerHTML = '<option value="all">All Categories</option>';
+      (appData.categories || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.toLowerCase();
+        opt.textContent = c;
+        catFilter.appendChild(opt);
+      });
+      catFilter.value = cur;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('txTableBody');
+      const emptyState = document.getElementById('emptyTxState');
+      const query = (document.getElementById('txSearchInput').value || '').toLowerCase().trim();
+      const catVal = document.getElementById('txCategoryFilter').value;
+
+      tbody.innerHTML = '';
+      const expenses = appData.expenses || [];
+
+      const filtered = expenses.filter(exp => {
+        const matchesQuery = !query || 
+          (exp.title || '').toLowerCase().includes(query) || 
+          (exp.category || '').toLowerCase().includes(query);
+        const matchesCat = catVal === 'all' || (exp.category || '').toLowerCase() === catVal;
+        return matchesQuery && matchesCat;
+      });
+
+      if (filtered.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      filtered.forEach(exp => {
+        const icon = window.ExpenseXDB.getCategoryIcon(exp.category);
+        const formattedDate = new Date(exp.date).toLocaleDateString('en-IN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="color: var(--text-muted); font-weight: 500;">${formattedDate}</td>
+          <td>
+            <span class="cat-badge">
+              <span>${icon}</span>
+              <span>${exp.category}</span>
+            </span>
+          </td>
+          <td style="font-weight: 600;">${exp.title}</td>
+          <td style="font-weight: 700; color: var(--text-main);">₹${(parseFloat(exp.amount) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right;">
+            <button class="btn-delete" onclick="handleDelete('${exp.id}')">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openAddExpenseModal() {
+      const select = document.getElementById('modalExpenseCategory');
+      select.innerHTML = '<option value="" disabled selected>Select category</option>';
+      (appData.categories || []).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = `${window.ExpenseXDB.getCategoryIcon(cat)} ${cat}`;
+        select.appendChild(opt);
+      });
+      document.getElementById('expenseModal').classList.add('show');
+    }
+
+    function closeAddExpenseModal() {
+      document.getElementById('expenseModal').classList.remove('show');
+    }
+
+    async function handleExpenseSave(e) {
+      e.preventDefault();
+      const category = document.getElementById('modalExpenseCategory').value;
+      const amount = parseFloat(document.getElementById('modalExpenseAmount').value) || 0;
+      const title = document.getElementById('modalExpenseTitle').value.trim();
+      const date = document.getElementById('modalExpenseDate').value;
+
+      await window.ExpenseXDB.addExpense(currentUser.uid, { title, amount, category, date });
+      window.ExpenseXAuth.showToast(`Expense recorded!`, 'success');
+      closeAddExpenseModal();
+    }
+
+    async function handleDelete(id) {
+      if (confirm('Delete this transaction?')) {
+        await window.ExpenseXDB.deleteExpense(currentUser.uid, id);
+        window.ExpenseXAuth.showToast('Expense removed', 'info');
+      }
+    }
+  </script>
+</body>
+</html>

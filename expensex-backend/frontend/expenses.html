@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpenseX - All Expenses</title>
+  <!-- Chart.js CDN for category breakdown visual -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary-color: #7c3aed;
+      --primary-dark: #6d28d9;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 2.5rem;
+    }
+
+    .dashboard-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .brand-header-center {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .brand-graphic {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-svg {
+      width: 48px;
+      height: 48px;
+    }
+
+    .brand-text-wrapper {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .brand-name {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--success);
+    }
+
+    .brand-name .x-accent {
+      color: var(--primary-color);
+    }
+
+    .back-btn {
+      background: #e2e8f0;
+      color: var(--text-main);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .back-btn:hover {
+      background: #cbd5e1;
+    }
+
+    .page-title-section {
+      margin-bottom: 2rem;
+    }
+
+    .page-title-section h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+
+    .visuals-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .visuals-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .lower-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+
+    .card h3 {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .table-section {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+
+    .table-section h3 {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--text-muted);
+      background-color: #f8fafc;
+    }
+
+    tr:hover td {
+      background-color: #f8fafc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background-color: #ede9fe;
+      color: var(--primary-color);
+      text-transform: capitalize;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.875rem;
+      transition: opacity 0.2s;
+    }
+
+    .delete-btn:hover {
+      opacity: 0.75;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .progress-bar-container {
+      background-color: #f1f5f9;
+      border-radius: 999px;
+      height: 8px;
+      width: 100%;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--success);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-bar-fill.over {
+      background-color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard-container">
+    <header>
+      <div class="brand-header-center">
+        <div class="brand-graphic">
+          <svg viewBox="0 0 100 100" class="brand-svg">
+            <path d="M 46 14 A 32 32 0 1 0 74 62" fill="none" stroke="#10b981" stroke-width="6.5" stroke-linecap="round" />
+            <polygon points="46,6 46,22 34,14" fill="#10b981" />
+            <text x="44" y="58" text-anchor="middle" font-size="34" font-weight="900" fill="#10b981" font-family="'Poppins', sans-serif">₹</text>
+            <line x1="58" y1="46" x2="80" y2="24" stroke="#7c3aed" stroke-width="5.5" stroke-linecap="round" />
+            <polygon points="85,20 72,21 82,32" fill="#7c3aed" />
+            <path d="M 52 82 L 52 70 L 64 70 L 64 56 L 76 56 L 76 42 L 86 42 L 86 82 Z" fill="#7c3aed" />
+          </svg>
+        </div>
+        <div class="brand-text-wrapper">
+          <h1 class="brand-name">Expense<span class="x-accent">X</span></h1>
+          <p class="brand-tagline" style="font-size:0.8rem; color:var(--text-muted); font-weight:500;">Track Expenses. Manage Better. Save More.</p>
+        </div>
+      </div>
+
+      <a href="dashboard.html" class="back-btn">← Back to Dashboard</a>
+    </header>
+
+    <div class="page-title-section">
+      <h2>All Expenses</h2>
+    </div>
+
+    <!-- Visual Analytics Section -->
+    <div class="visuals-grid">
+      <div class="card">
+        <h3>Category Breakdown</h3>
+        <div class="chart-container">
+          <canvas id="categoryPieChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Spending Summary</h3>
+        <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 1rem; padding: 0.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+            <span style="color: var(--text-muted); font-weight: 500;">Total Transactions</span>
+            <span id="total-count" style="font-weight: 700; font-size: 1.25rem; color: var(--success);">0</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+            <span style="color: var(--text-muted); font-weight: 500;">Total Amount Spent</span>
+            <span id="total-amount-sum" style="font-weight: 700; font-size: 1.25rem; color: var(--success);">₹0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lower Section: Category Budget/Spent Table & Transaction History Side-by-Side -->
+    <div class="lower-grid">
+      <!-- Category Spent Table -->
+      <div class="table-section">
+        <h3>Category Spent</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th style="text-align: right;">Budget / Spent</th>
+              </tr>
+            </thead>
+            <tbody id="categoryBudgetTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+        <div id="emptyBudgetState" class="empty-state" style="display: none; padding: 2rem;">
+          No categories found.
+        </div>
+      </div>
+
+      <!-- Detailed Expenses Table -->
+      <div class="table-section">
+        <h3>Transaction History</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="expenseTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+          No expenses recorded yet.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Robustly resolve active userKey without syntax collision
+    const activeUserKey = (() => {
+      const savedKey = localStorage.getItem('expenseX_userkey');
+      const savedEmail = localStorage.getItem('expenseX_email');
+      if (savedKey) return savedKey;
+      if (savedEmail) return savedEmail.split('@')[0].toLowerCase();
+      return 'user';
+    })();
+
+    let expenses = [];
+    let budgets = {};
+    let categories = [
+      'Food', 'Travel', 'Entertainment', 'Groceries', 'Medical', 'Bills and payments', 'Other'
+    ];
+
+    let categoryPieChart = null;
+
+    const categoryIcons = {
+      'food': '🍔',
+      'travel': '✈️',
+      'entertainment': '🎬',
+      'groceries': '🛒',
+      'medical': '💊',
+      'bills and payments': '⚡',
+      'other': '📦'
+    };
+
+    function getCategoryIcon(catName) {
+      const lower = catName.trim().toLowerCase();
+      return categoryIcons[lower] || '🏷️';
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadBackendData();
+    });
+
+    async function loadBackendData() {
+      try {
+        const response = await fetch(`http://localhost:5000/api/data/${activeUserKey}`);
+        const data = await response.json();
+        expenses = typeof data.expenses === 'string' ? JSON.parse(data.expenses) : (data.expenses || []);
+        budgets = typeof data.budgets === 'string' ? JSON.parse(data.budgets) : (data.budgets || {});
+        categories = typeof data.categories === 'string' ? JSON.parse(data.categories) : (data.categories || categories);
+      } catch (err) {
+        console.error('Backend connection failed, loading local storage fallback', err);
+        expenses = JSON.parse(localStorage.getItem(`expenseX_expenses_${activeUserKey}`)) || [];
+        budgets = JSON.parse(localStorage.getItem(`expenseX_budgets_${activeUserKey}`)) || {};
+        categories = JSON.parse(localStorage.getItem(`expenseX_categories_${activeUserKey}`)) || categories;
+      }
+      renderExpensesPage();
+    }
+
+    async function syncBackend() {
+      try {
+        await fetch(`http://localhost:5000/api/data/${activeUserKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userKey: activeUserKey,
+            expenses: JSON.stringify(expenses),
+            budgets: JSON.stringify(budgets),
+            categories: JSON.stringify(categories)
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync backend', err);
+      }
+    }
+
+    function renderExpensesPage() {
+      renderTransactionHistory();
+      renderCategoryBudgetTable();
+    }
+
+    function renderTransactionHistory() {
+      const tbody = document.getElementById('expenseTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const totalCountElem = document.getElementById('total-count');
+      const totalSumElem = document.getElementById('total-amount-sum');
+
+      tbody.innerHTML = '';
+
+      if (expenses.length === 0) {
+        emptyState.style.display = 'block';
+        totalCountElem.textContent = '0';
+        totalSumElem.textContent = '₹0';
+        renderChart({});
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      let totalSum = 0;
+      const categoryTotals = {};
+
+      sortedExpenses.forEach(exp => {
+        const amt = parseFloat(exp.amount) || 0;
+        totalSum += amt;
+
+        const cat = exp.category || 'Other';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
+
+        const tr = document.createElement('tr');
+        const formattedDate = new Date(exp.date).toLocaleDateString('en-IN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+
+        tr.innerHTML = `
+          <td>${formattedDate}</td>
+          <td><span class="badge">${exp.category}</span></td>
+          <td>₹${amt.toLocaleString('en-IN')}</td>
+          <td style="text-align: right;"><button class="delete-btn" onclick="deleteExpense(${exp.id})">Delete</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      totalCountElem.textContent = expenses.length;
+      totalSumElem.textContent = `₹${totalSum.toLocaleString('en-IN')}`;
+
+      renderChart(categoryTotals);
+    }
+
+    function renderCategoryBudgetTable() {
+      const tbody = document.getElementById('categoryBudgetTableBody');
+      const emptyState = document.getElementById('emptyBudgetState');
+      tbody.innerHTML = '';
+
+      const spentMap = {};
+      expenses.forEach(exp => {
+        const cat = exp.category;
+        const amt = parseFloat(exp.amount) || 0;
+        spentMap[cat] = (spentMap[cat] || 0) + amt;
+      });
+
+      const uniqueCategoryMap = new Map();
+
+      const registerCategory = (name) => {
+        if (!name) return;
+        const trimmed = name.trim();
+        const lower = trimmed.toLowerCase();
+        if (!uniqueCategoryMap.has(lower)) {
+          uniqueCategoryMap.set(lower, trimmed);
+        }
+      };
+
+      categories.forEach(registerCategory);
+      Object.keys(budgets).forEach(registerCategory);
+      Object.keys(spentMap).forEach(registerCategory);
+
+      const allNormalizedKeys = Array.from(uniqueCategoryMap.keys());
+
+      if (allNormalizedKeys.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      allNormalizedKeys.forEach(lowerKey => {
+        const displayName = uniqueCategoryMap.get(lowerKey);
+        const icon = getCategoryIcon(displayName);
+
+        let budgetAmt = 0;
+        Object.keys(budgets).forEach(bKey => {
+          if (bKey.trim().toLowerCase() === lowerKey) {
+            budgetAmt += budgets[bKey];
+          }
+        });
+
+        let spentAmt = 0;
+        Object.keys(spentMap).forEach(sKey => {
+          if (sKey.trim().toLowerCase() === lowerKey) {
+            spentAmt += spentMap[sKey];
+          }
+        });
+
+        const percentage = budgetAmt > 0 ? Math.min(Math.round((spentAmt / budgetAmt) * 100), 100) : (spentAmt > 0 ? 100 : 0);
+        const isOver = spentAmt > budgetAmt && budgetAmt > 0;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div style="display: flex; align-items: center; gap: 0.6rem; font-weight: 600;">
+              <span style="font-size: 1.2rem;">${icon}</span>
+              <span>${displayName}</span>
+            </div>
+          </td>
+          <td style="font-weight: 600; text-align: right; vertical-align: middle;">
+            <div style="margin-bottom: 2px;">₹${spentAmt.toLocaleString('en-IN')} / ₹${budgetAmt.toLocaleString('en-IN')}</div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill ${isOver ? 'over' : ''}" style="width: ${percentage}%;"></div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function deleteExpense(id) {
+      expenses = expenses.filter(exp => exp.id !== id);
+      localStorage.setItem(`expenseX_expenses_${activeUserKey}`, JSON.stringify(expenses));
+      syncBackend();
+      renderExpensesPage();
+    }
+
+    function renderChart(categoryTotals) {
+      const ctx = document.getElementById('categoryPieChart').getContext('2d');
+      const labels = Object.keys(categoryTotals);
+      const data = Object.values(categoryTotals);
+
+      if (categoryPieChart) {
+        categoryPieChart.destroy();
+      }
+
+      if (labels.length === 0) {
+        categoryPieChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['No Data'],
+            datasets: [{ data: [1], backgroundColor: ['#e2e8f0'] }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+          }
+        });
+        return;
+      }
+
+      const colors = ['#7c3aed', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#6366f1', '#14b8a6', '#84cc16'];
+
+      categoryPieChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: colors.slice(0, labels.length),
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                boxWidth: 12,
+                font: { size: 11 }
+              }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

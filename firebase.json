@@ -1,0 +1,26 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      "expensex-backend/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/dashboard",
+        "destination": "/dashboard.html"
+      },
+      {
+        "source": "/register",
+        "destination": "/register.html"
+      },
+      {
+        "source": "/expenses",
+        "destination": "/expenses.html"
+      }
+    ]
+  }
+}
