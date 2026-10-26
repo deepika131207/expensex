@@ -1,6 +1,7 @@
 /**
  * ExpenseX - Firestore Database Service
- * Provides real-time synchronization of budgets, expenses, and categories.
+ * Provides real-time synchronization of budgets, expenses, and categories,
+ * as well as granular subcollections for expenses and web application usage tracking.
  */
 
 const DEFAULT_CATEGORIES = [
@@ -103,10 +104,19 @@ const FirestoreService = {
     if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
       try {
         const db = firebase.firestore();
+        // Master budget document
         await db.collection('users').doc(uid).collection('budget_data').doc('main').set({
           ...data,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+
+        // Update overall stats on user document
+        await db.collection('users').doc(uid).set({
+          overallBudget: data.overallBudget || 0,
+          totalExpensesCount: (data.expenses || []).length,
+          lastDataSyncAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
         console.log("☁️ Synced to Firestore successfully");
         return true;
       } catch (e) {
@@ -167,10 +177,33 @@ const FirestoreService = {
     } else {
       const cleanKey = categoryKey.trim().toLowerCase();
       data.budgets[cleanKey] = num;
+
+      // Save to individual budget subcollection for granular Firestore queries
+      if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
+        try {
+          const db = firebase.firestore();
+          await db.collection('users').doc(uid).collection('budgets').doc(cleanKey).set({
+            category: cleanKey,
+            budgetLimit: num,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        } catch (e) {
+          console.warn("Could not save subcollection budget:", e);
+        }
+      }
     }
 
     this.saveLocalData(uid, data);
     await this.syncToFirestore(uid, data);
+
+    // Record web usage in Firestore
+    if (window.ExpenseXAuth && window.ExpenseXAuth.recordWebUsage) {
+      await window.ExpenseXAuth.recordWebUsage('SET_BUDGET', {
+        category: categoryKey,
+        amount: num
+      });
+    }
+
     return data;
   },
 
@@ -195,6 +228,31 @@ const FirestoreService = {
     data.expenses.unshift(newExpense);
     this.saveLocalData(uid, data);
     await this.syncToFirestore(uid, data);
+
+    // Save individual expense document in Firestore subcollection: users/{uid}/expenses/{id}
+    if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
+      try {
+        const db = firebase.firestore();
+        await db.collection('users').doc(uid).collection('expenses').doc(newExpense.id).set({
+          ...newExpense,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (e) {
+        console.warn("Could not save subcollection expense:", e);
+      }
+    }
+
+    // Record web usage in Firestore
+    if (window.ExpenseXAuth && window.ExpenseXAuth.recordWebUsage) {
+      await window.ExpenseXAuth.recordWebUsage('ADD_EXPENSE', {
+        id: newExpense.id,
+        title: newExpense.title,
+        amount: newExpense.amount,
+        category: newExpense.category,
+        date: newExpense.date
+      });
+    }
+
     return { data, newExpense };
   },
 
@@ -202,9 +260,29 @@ const FirestoreService = {
     const data = this.getLocalData(uid);
     if (!data.expenses) return data;
 
+    const removed = data.expenses.find(e => e.id === expenseId);
     data.expenses = data.expenses.filter(e => e.id !== expenseId);
     this.saveLocalData(uid, data);
     await this.syncToFirestore(uid, data);
+
+    // Delete from Firestore subcollection: users/{uid}/expenses/{id}
+    if (window.firebase && window.firebase.firestore && window.ExpenseXConfig.isFirebaseInitialized()) {
+      try {
+        const db = firebase.firestore();
+        await db.collection('users').doc(uid).collection('expenses').doc(expenseId).delete();
+      } catch (e) {
+        console.warn("Could not delete subcollection expense:", e);
+      }
+    }
+
+    // Record web usage in Firestore
+    if (window.ExpenseXAuth && window.ExpenseXAuth.recordWebUsage) {
+      await window.ExpenseXAuth.recordWebUsage('DELETE_EXPENSE', {
+        expenseId,
+        details: removed || {}
+      });
+    }
+
     return data;
   },
 
@@ -217,6 +295,10 @@ const FirestoreService = {
       data.categories.push(clean);
       this.saveLocalData(uid, data);
       await this.syncToFirestore(uid, data);
+
+      if (window.ExpenseXAuth && window.ExpenseXAuth.recordWebUsage) {
+        await window.ExpenseXAuth.recordWebUsage('ADD_CATEGORY', { category: clean });
+      }
     }
     return data;
   }

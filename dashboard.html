@@ -499,6 +499,10 @@
       document.getElementById('tabBtnBars').classList.toggle('active', tabName === 'bars');
       document.getElementById('tabBtnTransactions').classList.toggle('active', tabName === 'transactions');
 
+      if (window.ExpenseXAuth && window.ExpenseXAuth.recordWebUsage) {
+        window.ExpenseXAuth.recordWebUsage('TAB_VIEW', { tab: tabName });
+      }
+
       if (tabName === 'bars') {
         setTimeout(updateCharts, 100);
       }
