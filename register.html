@@ -293,29 +293,6 @@
       </div>
 
       <div class="form-group">
-        <label for="otp-method">Send OTP via *</label>
-        <div class="input-wrapper">
-          <span class="input-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-          </span>
-          <select id="otp-method" required>
-            <option value="email">Email</option>
-            <option value="sms">Phone number (SMS)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="address">Address</label>
-        <div class="input-wrapper">
-          <span class="input-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-          </span>
-          <input type="text" id="address" placeholder="Enter your address">
-        </div>
-      </div>
-
-      <div class="form-group">
         <label for="password">Password *</label>
         <div class="input-wrapper">
           <span class="input-icon">
@@ -388,8 +365,6 @@
       const fullname = document.getElementById('fullname').value.trim();
       const email = document.getElementById('email').value.trim();
       const phone = document.getElementById('phone').value.trim();
-      const otpMethod = document.getElementById('otp-method').value;
-      const address = document.getElementById('address').value.trim();
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirm-password').value;
       const securityQuestion = document.getElementById('security-question').value;
@@ -424,27 +399,19 @@
         const user = userCred.user;
         const userKey = user.uid;
 
-        // 2. Update Firebase Auth Profile Display Name
-        try {
-          await user.updateProfile({ displayName: fullname });
-        } catch (profileErr) {
-          console.warn('Profile name update note:', profileErr);
-        }
-
-        // 3. Generate 6-digit OTP code
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-        // 4. Save local session immediately (sub-second instant registration)
+        // 2. Save local session immediately for instant access
         localStorage.setItem('expenseX_userkey', userKey);
         localStorage.setItem('expenseX_fullname', fullname);
         localStorage.setItem(`expenseX_saved_name_${userKey}`, fullname);
         localStorage.setItem('expenseX_email', email);
         localStorage.setItem('expenseX_phone', phone);
-        localStorage.setItem('expenseX_otp_method', otpMethod);
-        localStorage.setItem('expenseX_pending_otp', otpCode);
-        localStorage.setItem('expenseX_otp_verified', 'false');
+        localStorage.removeItem('expenseX_pending_otp');
+        localStorage.setItem('expenseX_otp_verified', 'true');
 
-        // 5. Store user profile in Cloud Firestore (Non-blocking so it never hangs)
+        // 3. Fire-and-forget profile display name update in background
+        user.updateProfile({ displayName: fullname }).catch(() => {});
+
+        // 4. Fire-and-forget Cloud Firestore profile sync in background
         if (window.firebase && window.firebase.firestore) {
           try {
             const db = firebase.firestore();
@@ -453,30 +420,17 @@
               fullName: fullname,
               email: email,
               phone: phone,
-              otpMethod: otpMethod,
-              address: address,
               securityQuestion: securityQuestion,
               securityAnswer: securityAnswer,
-              otpCode: otpCode,
-              otpVerified: false,
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
               lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
               isOnline: true
-            }, { merge: true }).catch(dbErr => {
-              console.warn('Firestore sync will finalize once database is active:', dbErr);
-            });
-          } catch (dbErr) {
-            console.warn('Firestore init note:', dbErr);
-          }
+            }, { merge: true }).catch(() => {});
+          } catch (e) {}
         }
 
-        btn.textContent = 'Account created! Redirecting to OTP...';
-        sessionStorage.setItem('expenseX_show_otp_banner', otpCode);
-
-        // 6. Instantly navigate to OTP verification
-        setTimeout(() => {
-          window.location.href = 'otp.html';
-        }, 400);
+        // 5. Instantly redirect straight to Dashboard!
+        window.location.href = 'dashboard.html';
 
       } catch (err) {
         btn.disabled = false;

@@ -372,21 +372,13 @@
     window.addEventListener('DOMContentLoaded', () => {
       initFirebase();
 
-      // If user is already authenticated, redirect to appropriate page
+      // If user is already authenticated, redirect to dashboard
       firebase.auth().onAuthStateChanged((user) => {
         if (user) {
           const userKey = user.uid;
           localStorage.setItem('expenseX_userkey', userKey);
           localStorage.setItem('expenseX_email', user.email);
           localStorage.setItem('expenseX_fullname', user.displayName || user.email.split('@')[0]);
-
-          const otpVerified = localStorage.getItem('expenseX_otp_verified');
-          const pendingOtp = localStorage.getItem('expenseX_pending_otp');
-          if (otpVerified === 'false' && pendingOtp) {
-            window.location.href = 'otp.html';
-            return;
-          }
-
           window.location.href = 'dashboard.html';
         }
       });

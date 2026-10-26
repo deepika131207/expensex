@@ -447,14 +447,6 @@
     document.addEventListener("DOMContentLoaded", () => {
       initFirebase();
 
-      // Check OTP verification status
-      const otpVerified = localStorage.getItem('expenseX_otp_verified');
-      const pendingOtp = localStorage.getItem('expenseX_pending_otp');
-      if (otpVerified === 'false' && pendingOtp) {
-        window.location.href = 'otp.html';
-        return;
-      }
-
       firebase.auth().onAuthStateChanged((user) => {
         if (user) {
           activeUserKey = user.uid;
